@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>第一课 · 为什么用 TypeScript + 基础类型标注</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">第 1 课</span>
+<h1>为什么用 TypeScript + 基础类型标注</h1>
+<p class="subtitle">目标:看懂 TS 相对 JS 到底多了什么,能给变量/函数/数组/对象写出基础类型标注。</p>
+
+<h2>TypeScript 到底是什么</h2>
+<p>
+一句话:<strong>TypeScript = JavaScript + 一层静态类型检查</strong>。你现在写的 Vue/JS 代码,原样复制成 <code>.ts</code> 文件基本都能跑——因为 TS 是 JS 的超集,所有合法的 JS 语法都是合法的 TS 语法。
+</p>
+<p>
+关键的一点,也是最容易被误解的一点:<strong>类型标注不会改变代码运行时的行为</strong>。TS 编译时会检查类型对不对,但编译完产出的就是普通 JS,类型信息全部被擦除。类型检查只是"写代码时的安全网",不是运行时的功能。
+</p>
+<div class="callout">
+<div class="callout-title">对你的意义</div>
+你有 Promise/async-await、数组方法、模块化这些扎实基础,这些在 TS 里完全一样,不需要重学。TS 加的是一层"这个函数期望什么参数""这个对象长什么样"的显式约定——这正是"工程化"的核心:让团队协作、重构、读第三方库(以后是 Cesium、AI SDK)时不用靠猜。
+</div>
+
+<h2>类型推断:大多数时候不用手写类型</h2>
+<p>
+新手最常见的误区是给每个变量都手写类型。实际上 TS 会自动推断:
+</p>
+<pre><code>let count = 5;        // TS 自动推断为 number,不需要写 : number
+let name = "Ada";     // 自动推断为 string</code></pre>
+<p>
+只有在 TS <em>猜不出来</em>的地方(比如函数参数)才需要你手写类型。这是本课接下来的重点。
+</p>
+
+<h2>函数:参数和返回值</h2>
+<p>TS 猜不出一个函数会被怎么调用,所以参数类型必须手写;返回值类型可以省略(TS 会根据 <code>return</code> 推断),但显式写出来能让意图更清楚,也是团队协作里更推荐的写法。</p>
+<pre><code>function add(a: number, b: number): number {
+  return a + b;
+}
+
+const greet = (name: string): string => `Hello, ${name}`;</code></pre>
+
+<h2>数组和对象</h2>
+<pre><code>let ids: number[] = [1, 2, 3];
+
+function printUser(user: { name: string; age: number }): void {
+  console.log(user.name, user.age);
+}</code></pre>
+<p>下一课会讲怎么用 <code>interface</code>/<code>type</code> 给对象结构起名字,避免每次都写这种内联类型——今天先建立"对象也可以有类型"这个概念。</p>
+
+<h2>一个要避开的坑:<code>any</code></h2>
+<p>
+<code>any</code> 会让 TS 完全跳过这个变量的类型检查——相当于把这部分代码打回纯 JS。刚开始写 TS 时,报错太多容易忍不住到处标 <code>any</code> "先跑起来再说",但这会让类型系统形同虚设。遇到不确定的类型,先用 <code>unknown</code> 或者干脆让 TS 自动推断,这个话题后面会有专门一课细讲。
+</p>
+
+<h2>小测验</h2>
+
+<div class="quiz" data-answer="1">
+  <div class="quiz-question">1. 关于 TypeScript 编译后的代码,以下哪个说法正确?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">类型注解会被保留在产物里</button>
+    <button class="quiz-option" data-index="1">运行结果和原始 JS 完全一致</button>
+    <button class="quiz-option" data-index="2">类型错误会在运行时抛出异常</button>
+    <button class="quiz-option" data-index="3">语法会被转换成完全不同形式</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="0">
+  <div class="quiz-question">2. <code>let count = 5;</code> 这行代码中,count 的类型是什么?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">number 类型,由 TS 自动推断得出</button>
+    <button class="quiz-option" data-index="1">any 类型,因为没有显式标注</button>
+    <button class="quiz-option" data-index="2">string 类型,与初始值本身无关</button>
+    <button class="quiz-option" data-index="3">unknown 类型,必须手动收窄才能用</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="0">
+  <div class="quiz-question">3. 给函数参数和返回值加类型,应该写在哪里?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">参数名后面,返回值写在括号之后</button>
+    <button class="quiz-option" data-index="1">函数体内部第一行单独声明类型</button>
+    <button class="quiz-option" data-index="2">只能写返回值,参数不能标注类型</button>
+    <button class="quiz-option" data-index="3">写在函数名前面用尖括号包裹住</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="0">
+  <div class="quiz-question">4. 把一个变量标注为 <code>any</code> 会带来什么后果?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">TS 会跳过该变量的类型检查</button>
+    <button class="quiz-option" data-index="1">该变量运行时会自动变成字符串</button>
+    <button class="quiz-option" data-index="2">编译时会直接报错并阻止运行</button>
+    <button class="quiz-option" data-index="3">该变量只能赋值一次不能再修改</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<h2>动手练一下</h2>
+<p>
+打开 <a href="https://www.typescriptlang.org/play" target="_blank" rel="noopener">TypeScript Playground</a>(在线运行,不用装任何东西),把下面这段代码粘贴进去:
+</p>
+<pre><code>function add(a: number, b: number): number {
+  return a + b;
+}
+
+add(1, "2"); // 故意写错,看 TS 怎么报错</code></pre>
+<p>
+观察编辑器里的红色波浪线报错信息,再把 <code>"2"</code> 改成 <code>2</code> 看报错消失。然后自己试着写一个 <code>printUser</code> 函数,参数是一个 <code>{ name: string; age: number }</code> 的对象,故意传错一个字段类型,感受一下报错长什么样——这就是 TS 给你的即时反馈循环,以后读报错会越来越快。
+</p>
+
+<h2>参考资料</h2>
+<ul>
+<li><a href="https://www.typescriptlang.org/docs/handbook/typescript-in-5-minutes.html">TypeScript for JavaScript Programmers</a> —— 本课核心内容的官方原文,推荐通读一遍。</li>
+<li><a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html">Everyday Types</a> —— 更完整的基础类型列表。</li>
+<li><a href="../reference/basic-types-cheatsheet.html">速查表:基础类型标注</a> —— 本课内容的压缩版,以后忘了随时回来查。</li>
+</ul>
+
+<div class="callout">
+<div class="callout-title">卡住了?</div>
+这些内容如果有任何地方没搞懂——不管是 Playground 报错看不懂,还是类型推断的原理想不通——随时问我,我是你的老师,这就是我在这儿的意义。
+</div>
+
+<div class="nav-links">
+  <span>上一课:无(这是第一课)</span>
+  <span>下一课:<a href="0002-interfaces-and-type-aliases.html">interface / type —— 给对象结构起名字</a></span>
+</div>
+
+</div>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

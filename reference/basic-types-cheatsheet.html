@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>速查表 · TypeScript 基础类型标注</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">速查表</span>
+<h1>TypeScript 基础类型标注</h1>
+<p class="subtitle">配合《<a href="../lessons/0001-why-typescript-and-basic-types.html">为什么用 TypeScript + 基础类型标注</a>》食用</p>
+
+<h2>变量</h2>
+<pre><code>let age: number = 18;
+let name: string = "Ada";
+let isDone: boolean = false;
+
+// 大多数时候可以省略标注,让 TS 自动推断:
+let age2 = 18; // 推断为 number,效果一样
+</code></pre>
+
+<h2>数组</h2>
+<pre><code>let ids: number[] = [1, 2, 3];
+let names: string[] = ["a", "b"];
+let ids2: Array&lt;number&gt; = [1, 2, 3]; // 等价写法
+</code></pre>
+
+<h2>函数</h2>
+<pre><code>// 参数类型写在参数名后面,返回值类型写在 ) 后面
+function add(a: number, b: number): number {
+  return a + b;
+}
+
+// 箭头函数同理
+const add2 = (a: number, b: number): number =&gt; a + b;
+
+// 没有返回值时用 void
+function log(msg: string): void {
+  console.log(msg);
+}
+</code></pre>
+
+<h2>对象(内联类型)</h2>
+<pre><code>function printUser(user: { name: string; age: number }): void {
+  console.log(user.name, user.age);
+}
+</code></pre>
+
+<h2>特殊类型</h2>
+<table style="width:100%; border-collapse: collapse; font-family: -apple-system, sans-serif; font-size: 0.92rem;">
+<tr style="border-bottom:1px solid var(--border);"><td style="padding:0.4em 0;"><code>any</code></td><td>关闭该变量的类型检查,尽量少用</td></tr>
+<tr style="border-bottom:1px solid var(--border);"><td style="padding:0.4em 0;"><code>unknown</code></td><td>比 <code>any</code> 安全的"未知类型",使用前必须先收窄</td></tr>
+<tr style="border-bottom:1px solid var(--border);"><td style="padding:0.4em 0;"><code>void</code></td><td>函数没有返回值</td></tr>
+<tr><td style="padding:0.4em 0;"><code>never</code></td><td>函数永远不会正常返回(比如一直抛异常)</td></tr>
+</table>
+
+<div class="callout">
+<div class="callout-title">记住</div>
+类型标注不会改变代码运行时的行为——TypeScript 编译后类型信息全部被擦除,产物就是普通 JS。类型检查只发生在写代码/编译的时候。
+</div>
+
+<p class="note">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html">TypeScript Handbook · Everyday Types</a></p>
+
+</div>
+</body>
+</html>

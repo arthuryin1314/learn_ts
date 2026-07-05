@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>速查表 · interface 与 type</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">速查表</span>
+<h1>interface 与 type</h1>
+<p class="subtitle">配合《<a href="../lessons/0002-interfaces-and-type-aliases.html">interface / type —— 给对象结构起名字</a>》食用</p>
+
+<h2>基本写法</h2>
+<pre><code>// interface
+interface User {
+  name: string;
+  age: number;
+}
+
+// type
+type User = {
+  name: string;
+  age: number;
+};
+
+// 两种写法用起来完全一样:
+function printUser(user: User): void {
+  console.log(user.name, user.age);
+}
+</code></pre>
+
+<h2>可选属性 <code>?</code></h2>
+<pre><code>interface User {
+  name: string;
+  age?: number; // 可以不传
+}
+
+printUser({ name: "Ella" }); // 合法
+</code></pre>
+
+<h2>只读属性 <code>readonly</code></h2>
+<pre><code>interface Point {
+  readonly lng: number;
+  readonly lat: number;
+}
+
+const p: Point = { lng: 116.4, lat: 39.9 };
+p.lng = 100; // 编译报错:Cannot assign to 'lng' because it is a read-only property.
+</code></pre>
+
+<h2>联合类型 <code>|</code>(先混个脸熟,下节课细讲)</h2>
+<pre><code>interface Feature {
+  geometryType: "Point" | "LineString" | "Polygon";
+}
+</code></pre>
+
+<h2>interface 继承 / type 交叉</h2>
+<pre><code>// interface 用 extends
+interface BaseLayer {
+  id: string;
+  visible: boolean;
+}
+interface VectorLayer extends BaseLayer {
+  features: number;
+}
+
+// type 用 &amp;(交叉类型)
+type BaseLayer = { id: string; visible: boolean };
+type VectorLayer = BaseLayer &amp; { features: number };
+</code></pre>
+
+<h2>interface 还是 type?</h2>
+<table style="width:100%; border-collapse: collapse; font-family: -apple-system, sans-serif; font-size: 0.92rem;">
+<tr style="border-bottom:1px solid var(--border);"><td style="padding:0.4em 0; width:35%;">描述对象/类的结构</td><td>两者都行,团队统一用一种即可;官方推荐优先 <code>interface</code></td></tr>
+<tr style="border-bottom:1px solid var(--border);"><td style="padding:0.4em 0;">需要联合类型、元组、函数类型别名</td><td>只能用 <code>type</code></td></tr>
+<tr><td style="padding:0.4em 0;">同名声明自动合并(declaration merging)</td><td>只有 <code>interface</code> 支持</td></tr>
+</table>
+
+<div class="callout">
+<div class="callout-title">记住</div>
+起名字之后,类型可以像变量一样被复用、被继承、被传给函数参数——这是它们比"内联对象类型"更强大的地方。
+</div>
+
+<p class="note">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/objects.html">TypeScript Handbook · Object Types</a></p>
+
+</div>
+</body>
+</html>
