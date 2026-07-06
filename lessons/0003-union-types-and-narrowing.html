@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>第三课 · 联合类型与类型收窄</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">第 3 课</span>
+<h1>联合类型与类型收窄</h1>
+<p class="subtitle">目标:能声明"多选一"的联合类型,并用类型收窄安全地处理每一种情况。</p>
+
+<h2>回顾:上节课埋的伏笔</h2>
+<p>
+上节课"动手练一下"的最后,让你给 <code>Layer</code> 加一个字段:
+</p>
+<pre><code>readonly type: "vector" | "raster";</code></pre>
+<p>
+这里的 <code>"vector" | "raster"</code> 就是这节课的主角——<strong>联合类型</strong>(union type)。今天来搞清楚它到底是什么,以及为什么光声明还不够,还得配合"类型收窄"才能真正好用。
+</p>
+
+<h2>联合类型:表示"这个值只能是几种类型之一"</h2>
+<pre><code>function formatFeatureId(id: string | number): string {
+  // id 的类型是 "string 或者 number 之一"
+  return String(id);
+}
+
+formatFeatureId("layer-1"); // 合法
+formatFeatureId(42);        // 也合法
+formatFeatureId(true);      // 报错:boolean 不在 string | number 里</code></pre>
+<p>
+<code>|</code> 读作"或"。<code>string | number</code> 表示这个值的类型必须是这两者之一,不能是别的类型,也不需要同时满足两者。
+</p>
+
+<h2>光有联合类型还不够</h2>
+<p>
+结合你熟悉的图层场景,假设矢量图层和栅格图层各有自己独有的配置字段:
+</p>
+<pre><code>interface VectorLayerConfig {
+  type: "vector";
+  sourceUrl: string;
+}
+
+interface RasterLayerConfig {
+  type: "raster";
+  tileSize: number;
+}
+
+type LayerConfig = VectorLayerConfig | RasterLayerConfig;
+
+function loadLayer(config: LayerConfig): void {
+  console.log(config.sourceUrl);
+  // 报错!Property 'sourceUrl' does not exist on type 'RasterLayerConfig'.
+}</code></pre>
+<p>
+为什么会报错?因为 <code>config</code> 的类型是"两者之一",TS 不知道调用的这一刻它具体是哪一个——如果恰好是 <code>RasterLayerConfig</code>,那它根本没有 <code>sourceUrl</code> 这个字段。TS 在编译期就把这种"可能访问不存在的属性"的风险拦下来了。
+</p>
+
+<h2>类型收窄:typeof(适合基础类型)</h2>
+<p>把 <code>formatFeatureId</code> 写完整,需要先判断再使用:</p>
+<pre><code>function formatFeatureId(id: string | number): string {
+  if (typeof id === "number") {
+    return `#${id}`;          // 这个分支里,TS 知道 id 一定是 number
+  }
+  return id.toUpperCase();    // 这个分支里,TS 知道 id 一定是 string
+}</code></pre>
+<p>
+这个过程叫<strong>类型收窄</strong>(narrowing):通过 <code>if</code> 判断,TS 会在每个分支里把联合类型"收窄"成更具体的那一种,让你能放心调用该类型独有的方法(比如 <code>string</code> 才有的 <code>.toUpperCase()</code>)。
+</p>
+
+<h2>类型收窄:可辨识联合(适合对象)</h2>
+<p>回到图层配置的例子,同样的思路,判断条件换成公共字段 <code>type</code>:</p>
+<pre><code>function loadLayer(config: LayerConfig): void {
+  if (config.type === "vector") {
+    console.log("加载矢量图层:", config.sourceUrl); // 安全,这里收窄成 VectorLayerConfig
+  } else {
+    console.log("加载栅格图层, tileSize:", config.tileSize); // 安全,这里收窄成 RasterLayerConfig
+  }
+}</code></pre>
+<div class="callout">
+<div class="callout-title">可辨识联合(discriminated union)</div>
+像 <code>type: "vector"</code> 这种每个分支取值都不同、且是字符串字面量类型的公共字段,叫"辨识字段"(discriminant)。有了它,TS 只要看一眼这个字段的值,就能在对应分支里精确推断出完整的类型——这是处理"一个变量可能是好几种不同形状的对象"时最常用、最推荐的模式。
+</div>
+
+<h2>小测验</h2>
+
+<div class="quiz" data-answer="1">
+  <div class="quiz-question">1. 联合类型 <code>string | number</code> 表示什么?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">变量必须同时满足两种类型的所有要求</button>
+    <button class="quiz-option" data-index="1">变量的值只能是这两种类型中的其中一种</button>
+    <button class="quiz-option" data-index="2">变量会被自动转换成字符串类型</button>
+    <button class="quiz-option" data-index="3">变量在运行时会报类型不匹配错误</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="0">
+  <div class="quiz-question">2. 为什么直接访问 <code>config.sourceUrl</code>(未收窄前)会报错?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">因为 TS 认为 config 可能是没有这个属性的另一种类型</button>
+    <button class="quiz-option" data-index="1">因为 sourceUrl 这个属性名本身拼写有误</button>
+    <button class="quiz-option" data-index="2">因为联合类型不允许定义任何具体属性</button>
+    <button class="quiz-option" data-index="3">因为这个属性只能在运行时才会被创建出来</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="1">
+  <div class="quiz-question">3. 用 <code>if (config.type === "vector")</code> 判断之后,该分支里 TS 会怎么处理 config 的类型?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">依然把 config 当成联合类型的两种可能都算</button>
+    <button class="quiz-option" data-index="1">自动把 config 收窄成 VectorLayerConfig 这一种</button>
+    <button class="quiz-option" data-index="2">直接把 config 的类型标注清除掉不再检查</button>
+    <button class="quiz-option" data-index="3">需要额外手写类型断言才能收窄成功</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<h2>动手练一下</h2>
+<p>在 <a href="https://www.typescriptlang.org/play" target="_blank" rel="noopener">TypeScript Playground</a> 里试试:</p>
+<pre><code>interface PointFeature {
+  kind: "point";
+  coordinates: [number, number];
+}
+
+interface LineFeature {
+  kind: "line";
+  coordinates: [number, number][];
+}
+
+type MapFeature = PointFeature | LineFeature;
+
+function describeFeature(feature: MapFeature): string {
+  if (feature.kind === "point") {
+    return `点坐标: ${feature.coordinates[0]}, ${feature.coordinates[1]}`;
+  } else {
+    return `线段包含 ${feature.coordinates.length} 个点`;
+  }
+}
+
+console.log(describeFeature({ kind: "point", coordinates: [116.4, 39.9] }));</code></pre>
+<p>
+跑通之后自己试着:1) 把 <code>if</code> 分支里的收窄判断删掉,直接写 <code>feature.coordinates[0]</code>,看 TS 会不会报错、报的什么错;2) 加一个 <code>PolygonFeature</code>(<code>kind: "polygon"</code>,<code>coordinates: [number, number][][]</code>),扩展联合类型和 <code>describeFeature</code> 的判断分支。
+</p>
+
+<h2>参考资料</h2>
+<ul>
+<li><a href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html">TypeScript Handbook · Narrowing</a> —— 本课核心内容的官方原文。</li>
+<li><a href="../reference/union-types-cheatsheet.html">速查表:联合类型与类型收窄</a> —— 本课内容压缩版。</li>
+</ul>
+
+<div class="callout">
+<div class="callout-title">卡住了?</div>
+联合类型什么时候该用 typeof、什么时候该用可辨识联合,或者报错看不懂,随时问我。
+</div>
+
+<div class="nav-links">
+  <span>上一课:<a href="0002-interfaces-and-type-aliases.html">interface / type —— 给对象结构起名字</a></span>
+  <span>下一课:泛型入门</span>
+</div>
+
+</div>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>
