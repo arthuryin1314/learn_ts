@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>速查表 · 类型断言与枚举</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">速查表</span>
+<h1>类型断言(as)与枚举(enum)</h1>
+<p class="subtitle">配合《<a href="../lessons/0007-type-assertion-and-enum.html">类型断言(as)与枚举(enum)</a>》食用</p>
+
+<h2>类型断言 as</h2>
+<pre><code>const raw: unknown = JSON.parse(text);
+const config = raw as { name: string; visible: boolean };
+// 只在编译期生效,不做运行时检查——断言错了运行时可能直接崩
+</code></pre>
+
+<h2>as const</h2>
+<pre><code>const kind = "vector" as const; // 类型是字面量 "vector",不是 string
+</code></pre>
+
+<h2>enum</h2>
+<pre><code>enum LayerKind {
+  Vector = "vector",
+  Raster = "raster",
+}
+
+const kind: LayerKind = LayerKind.Vector;
+Object.values(LayerKind); // 运行时真实存在的对象,可以遍历
+</code></pre>
+
+<h2>enum vs 字符串联合类型</h2>
+<pre><code>type LayerKindUnion = "vector" | "raster"; // 纯编译期,零运行时开销,擦除
+enum LayerKind { Vector = "vector", Raster = "raster" } // 运行时真实对象
+</code></pre>
+
+<div class="callout">
+<div class="callout-title">记住</div>
+类型收窄(if/typeof)是"运行时检查换信任",<code>as</code> 是"没检查、直接要求信任"——能收窄就不要用 <code>as</code>。<code>enum</code> 是本课目前唯一一个编译后不会被完全擦除的类型概念。
+</div>
+
+<p class="note">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#type-assertions">TypeScript Handbook · Type Assertions</a> / <a href="https://www.typescriptlang.org/docs/handbook/enums.html">Enums</a></p>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>第四课 · Class 语法基础与 TS 的类型能力</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">第 4 课</span>
+<h1>Class 语法基础与 TS 的类型能力</h1>
+<p class="subtitle">目标:补齐 JS class 本身的语法,再叠加 TS 给 class 加的访问控制、参数属性和抽象类——为下一课的泛型打好地基。</p>
+
+<h2>为什么先讲 class,不直接进泛型</h2>
+<p>
+之前几课的例子都用 <code>interface</code> 描述"数据长什么样"(比如 <code>VectorLayerConfig</code>)。但如果一个东西不只是数据,还带有行为(方法)、需要被实例化、或者要表达"继承"关系,JS/TS 里通常用 <code>class</code>。泛型和工具类型的例子里经常会出现 class,所以这节课先把 class 本身(包括你之前自评"一般水平"的 JS class 语法)和 TS 给它加的类型能力一起讲清楚。
+</p>
+
+<h2>JS class 基础复习</h2>
+<p>这部分是 JavaScript 本身的语法,不是 TS 独有的:</p>
+<pre><code>class MapLayer {
+  constructor(name, visible) {
+    this.name = name;       // 实例字段
+    this.visible = visible;
+  }
+
+  toggle() {                // 实例方法
+    this.visible = !this.visible;
+    console.log(`${this.name} 现在${this.visible ? "显示" : "隐藏"}`);
+  }
+}
+
+const river = new MapLayer("river", true);
+river.toggle(); // river 现在隐藏</code></pre>
+<p>
+继承用 <code>extends</code> + <code>super</code>:
+</p>
+<pre><code>class VectorLayer extends MapLayer {
+  constructor(name, visible, sourceUrl) {
+    super(name, visible);   // 调用父类 constructor,先初始化 name/visible
+    this.sourceUrl = sourceUrl;
+  }
+}
+
+const roads = new VectorLayer("roads", true, "/data/roads.geojson");
+roads.toggle(); // 继承自 MapLayer 的方法照样能用</code></pre>
+
+<h2>TS 加的类型能力一:访问修饰符</h2>
+<p>
+JS 的字段默认谁都能从外部访问和修改。TS 加了三个访问修饰符,在<strong>编译期</strong>限制谁能访问某个字段/方法:
+</p>
+<pre><code>class MapLayer {
+  public name: string;       // 默认就是 public,随便写不写都一样
+  private visible: boolean;  // 只能在 MapLayer 内部访问
+  protected sourceUrl: string; // 能在 MapLayer 和它的子类里访问
+
+  constructor(name: string, visible: boolean, sourceUrl: string) {
+    this.name = name;
+    this.visible = visible;
+    this.sourceUrl = sourceUrl;
+  }
+}
+
+const layer = new MapLayer("river", true, "/data/river.geojson");
+layer.name;    // 合法
+layer.visible; // 报错:Property 'visible' is private and only accessible within class 'MapLayer'.</code></pre>
+<div class="callout">
+<div class="callout-title">和 [[0004]] 的 readonly 是同一套心智模型</div>
+<code>private</code>/<code>protected</code> 和 <code>readonly</code> 一样,只是编译期的访问控制,编译成 JS 之后这几个关键字直接被擦除,运行时字段和普通属性没有任何区别——也就是说如果用 <code>(layer as any).visible</code> 绕过 TS 检查,运行时照样能读写成功。如果你需要"运行时真正隐藏、外部绝对访问不到"的字段,要用 JS 原生的 <code>#field</code> 私有字段语法(这节课不展开,知道这个区别存在就够了)。
+</div>
+
+<h2>TS 加的类型能力二:参数属性(简写)</h2>
+<p>
+"在 constructor 参数前面加访问修饰符,自动声明字段并赋值"是很常用的简写:
+</p>
+<pre><code>class MapLayer {
+  constructor(
+    public name: string,
+    private visible: boolean,
+    protected sourceUrl: string
+  ) {}
+  // 等价于上一节里手写的三个字段声明 + constructor 里的三行赋值
+}</code></pre>
+
+<h2>TS 加的类型能力三:抽象类(abstract class)</h2>
+<p>
+如果想表达"MapLayer 只是个模板,不该被直接实例化,具体怎么渲染由子类决定",用 <code>abstract</code>:
+</p>
+<pre><code>abstract class MapLayer {
+  constructor(public name: string) {}
+
+  abstract render(): void; // 只声明方法签名,不写实现,子类必须自己实现
+
+  describe(): void {
+    console.log(`图层:${this.name}`); // 普通方法,子类直接继承
+  }
+}
+
+class VectorLayer extends MapLayer {
+  render(): void {
+    console.log(`渲染矢量图层 ${this.name}`);
+  }
+}
+
+new MapLayer("river");  // 报错:Cannot create an instance of an abstract class.
+new VectorLayer("roads").render(); // 合法:渲染矢量图层 roads</code></pre>
+<p>
+这和第三课的可辨识联合是同一个问题("一堆不同形状的东西,怎么统一处理")的另一种解法:可辨识联合适合"纯数据 + if/switch 判断",抽象类适合"每种情况都有自己的一套方法实现,想让 TS 强制每个子类都必须实现某个方法"。
+</p>
+
+<h2>TS 加的类型能力四:implements</h2>
+<p>用 <code>implements</code> 让一个 class 保证满足某个 interface 的形状:</p>
+<pre><code>interface Renderable {
+  render(): void;
+}
+
+class RasterLayer implements Renderable {
+  constructor(public name: string) {}
+  render(): void {
+    console.log(`渲染栅格图层 ${this.name}`);
+  }
+  // 如果漏写 render 方法,TS 会报错:Class 'RasterLayer' incorrectly implements interface 'Renderable'.
+}</code></pre>
+
+<h2>小测验</h2>
+
+<div class="quiz" data-answer="1">
+  <div class="quiz-question">1. 一个字段声明成 <code>private</code>,编译成 JS 并运行后会怎样?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">运行时外部代码访问这个字段会直接报错崩溃</button>
+    <button class="quiz-option" data-index="1">private 被擦除,运行时它和普通属性没有任何区别</button>
+    <button class="quiz-option" data-index="2">这个字段会从编译后的 JS 代码里被删除</button>
+    <button class="quiz-option" data-index="3">只有 Node.js 环境支持,浏览器里会报错</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="2">
+  <div class="quiz-question">2. <code>constructor(public name: string) {}</code> 这种写法(参数属性)等价于什么?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">只是声明了一个函数参数,不会创建字段</button>
+    <button class="quiz-option" data-index="1">声明了字段,但需要另外手写赋值才生效</button>
+    <button class="quiz-option" data-index="2">同时声明了 name 字段,并在 constructor 里自动赋值 this.name = name</button>
+    <button class="quiz-option" data-index="3">让 name 变成静态字段,所有实例共享同一个值</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="0">
+  <div class="quiz-question">3. 为什么 <code>new MapLayer("river")</code> 在 MapLayer 是 abstract class 时会报错?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">abstract class 只能作为父类被继承,不能直接实例化</button>
+    <button class="quiz-option" data-index="1">因为 constructor 缺少了 visible 参数</button>
+    <button class="quiz-option" data-index="2">因为 abstract 方法在运行时找不到具体实现会抛异常</button>
+    <button class="quiz-option" data-index="3">因为 abstract class 不允许有 constructor</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<h2>动手练一下</h2>
+<p>在 <a href="https://www.typescriptlang.org/play" target="_blank" rel="noopener">TypeScript Playground</a> 里试试:</p>
+<pre><code>abstract class MapLayer {
+  constructor(public name: string, protected visible: boolean) {}
+  abstract render(): void;
+}
+
+class VectorLayer extends MapLayer {
+  constructor(name: string, visible: boolean, private sourceUrl: string) {
+    super(name, visible);
+  }
+  render(): void {
+    console.log(`渲染矢量图层 ${this.name},数据源:${this.sourceUrl}`);
+  }
+}
+
+const roads = new VectorLayer("roads", true, "/data/roads.geojson");
+roads.render();</code></pre>
+<p>
+跑通之后自己试着:1) 再加一个 <code>RasterLayer extends MapLayer</code>,自己决定要不要额外的私有字段;2) 故意注释掉 <code>RasterLayer</code> 的 <code>render</code> 方法,看 TS 报什么错;3) 试着在类外部写 <code>roads.sourceUrl</code>,确认 TS 会不会拦下来。
+</p>
+
+<h2>参考资料</h2>
+<ul>
+<li><a href="https://www.typescriptlang.org/docs/handbook/2/classes.html">TypeScript Handbook · Classes</a> —— 本课核心内容的官方原文,包含更多细节(比如静态字段、getter/setter)。</li>
+<li><a href="../reference/classes-cheatsheet.html">速查表:Class 语法与访问修饰符</a> —— 本课内容压缩版。</li>
+</ul>
+
+<div class="callout">
+<div class="callout-title">卡住了?</div>
+JS class 语法本身,或者 TS 加的访问修饰符/抽象类,哪个环节没搞懂,随时问我。
+</div>
+
+<div class="nav-links">
+  <span>上一课:<a href="0003-union-types-and-narrowing.html">联合类型与类型收窄</a></span>
+  <span>下一课:<a href="0005-generics-basics.html">泛型入门</a></span>
+</div>
+
+</div>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

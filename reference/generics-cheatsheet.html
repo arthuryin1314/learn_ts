@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>速查表 · 泛型入门</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">速查表</span>
+<h1>泛型入门</h1>
+<p class="subtitle">配合《<a href="../lessons/0005-generics-basics.html">泛型入门</a>》食用</p>
+
+<h2>泛型函数</h2>
+<pre><code>function identity&lt;T&gt;(value: T): T {
+  return value;
+}
+
+const y = identity("hello"); // T 被推断为 string
+</code></pre>
+
+<h2>泛型约束(extends,表示"必须满足这个形状")</h2>
+<pre><code>interface HasLength {
+  length: number;
+}
+
+function logLength&lt;T extends HasLength&gt;(value: T): T {
+  console.log(value.length);
+  return value;
+}
+</code></pre>
+
+<h2>泛型接口</h2>
+<pre><code>interface Feature&lt;G&gt; {
+  type: "Feature";
+  geometry: G;
+  properties: Record&lt;string, unknown&gt;;
+}
+
+const pointFeature: Feature&lt;{ type: "Point"; coordinates: [number, number] }&gt; = {
+  type: "Feature",
+  geometry: { type: "Point", coordinates: [116.4, 39.9] },
+  properties: {},
+};
+</code></pre>
+
+<h2>泛型 class</h2>
+<pre><code>class LayerGroup&lt;T extends MapLayer&gt; {
+  private layers: T[] = [];
+  add(layer: T): void {
+    this.layers.push(layer);
+  }
+}
+
+const vectorGroup = new LayerGroup&lt;VectorLayer&gt;();
+// vectorGroup.add() 现在只接受 VectorLayer
+</code></pre>
+
+<div class="callout">
+<div class="callout-title">记住</div>
+泛型里的 <code>extends</code> 表示"约束/必须满足这个形状",和 class 继承的 <code>extends</code>(表示"继承自")不是同一件事,虽然写法一样。
+</div>
+
+<p class="note">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/generics.html">TypeScript Handbook · Generics</a></p>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>第六课 · 工具类型(Utility Types)</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">第 6 课</span>
+<h1>工具类型(Utility Types)</h1>
+<p class="subtitle">目标:掌握 <code>Partial</code>、<code>Required</code>、<code>Pick</code>、<code>Omit</code>、<code>Readonly</code>、<code>Record</code>——这些是"从已有类型派生新类型"的标准工具,不用每次都手写一个新 interface。</p>
+
+<h2>问题:已经有一个类型了,但需要它的"变体"</h2>
+<p>
+第四课定义过 <code>VectorLayer</code> 需要 <code>name</code>、<code>visible</code>、<code>sourceUrl</code> 三个字段。假设现在要写一个"更新图层配置"的函数,调用者可能只想改其中一两个字段,其余保持不变。如果手写一个新 interface,所有字段都要重复声明一遍,而且原类型一旦改动,这个新类型很容易忘记同步。工具类型就是用来"从已有类型派生"的,不用手写重复的字段列表。
+</p>
+
+<h2>Partial&lt;T&gt;:把所有字段变成可选</h2>
+<pre><code>interface LayerConfig {
+  name: string;
+  visible: boolean;
+  sourceUrl: string;
+}
+
+function updateLayer(id: string, changes: Partial&lt;LayerConfig&gt;): void {
+  // changes 里 name/visible/sourceUrl 全部变成可选,调用者传哪个改哪个
+}
+
+updateLayer("roads", { visible: false });              // 合法,只传一个字段
+updateLayer("roads", { name: "roads-v2", visible: true }); // 合法,传多个
+updateLayer("roads", {});                                // 合法,一个都不传</code></pre>
+<p>
+<code>Partial&lt;LayerConfig&gt;</code> 相当于把 <code>LayerConfig</code> 里的每个字段都自动加上 <code>?</code>,等价于手写:
+</p>
+<pre><code>interface LayerConfigPartial {
+  name?: string;
+  visible?: boolean;
+  sourceUrl?: string;
+}</code></pre>
+
+<h2>Required&lt;T&gt;:反过来,把所有字段变成必填</h2>
+<p>
+如果原类型里某些字段本来是可选的(比如 <code>sourceUrl?: string</code>),但某个场景下必须全部提供,用 <code>Required</code>:
+</p>
+<pre><code>interface LayerConfigLoose {
+  name: string;
+  sourceUrl?: string; // 本来可选
+}
+
+function saveLayer(config: Required&lt;LayerConfigLoose&gt;): void {
+  // 这里 sourceUrl 变成必填,不传会报错
+}
+
+saveLayer({ name: "roads" }); // 报错:缺少 sourceUrl</code></pre>
+
+<h2>Pick&lt;T, K&gt;:只挑几个字段出来</h2>
+<pre><code>type LayerSummary = Pick&lt;LayerConfig, "name" | "visible"&gt;;
+// 等价于 interface LayerSummary { name: string; visible: boolean; }
+
+const summary: LayerSummary = { name: "roads", visible: true };
+// summary.sourceUrl; // 报错,Pick 之后这个字段根本不存在</code></pre>
+<p>
+第二个类型参数 <code>K</code> 是字段名组成的联合类型(字符串字面量),必须是 <code>T</code> 里真实存在的字段名,写错字段名 TS 会直接报错。
+</p>
+
+<h2>Omit&lt;T, K&gt;:和 Pick 相反,排除几个字段</h2>
+<pre><code>type LayerWithoutSource = Omit&lt;LayerConfig, "sourceUrl"&gt;;
+// 等价于 interface LayerWithoutSource { name: string; visible: boolean; }</code></pre>
+<p>
+<code>Pick</code> 和 <code>Omit</code> 做的是同一件事的两种表达方式:字段少的时候用 <code>Pick</code> 直接列出要留下的,字段多、只想去掉一两个的时候用 <code>Omit</code> 更省事。
+</p>
+
+<h2>Readonly&lt;T&gt;:把所有字段变成只读</h2>
+<pre><code>type FrozenLayerConfig = Readonly&lt;LayerConfig&gt;;
+
+const config: FrozenLayerConfig = { name: "roads", visible: true, sourceUrl: "/data/roads.geojson" };
+config.name = "roads-v2"; // 报错:Cannot assign to 'name' because it is a read-only property.</code></pre>
+<p>
+这里的 <code>readonly</code> 和第一课/第四课提到的 <code>readonly</code> 关键字是同一个语义,只是 <code>Readonly&lt;T&gt;</code> 一次性把所有字段都标成 <code>readonly</code>,不用逐个字段手写。
+</p>
+
+<h2>Record&lt;K, V&gt;:批量声明"键是 K 类型、值是 V 类型"的对象</h2>
+<p>第五课在 <code>Feature&lt;G&gt;</code> 里已经预告过,这里正式讲:</p>
+<pre><code>const layerVisibility: Record&lt;string, boolean&gt; = {
+  roads: true,
+  lake: false,
+  buildings: true,
+};
+
+layerVisibility.roads;   // boolean
+layerVisibility.anything; // 也是 boolean 类型(TS 不知道具体有没有这个 key,但类型上认为是 boolean)</code></pre>
+<p>
+<code>Record&lt;K, V&gt;</code> 常用在"key 的具体名字不重要或者不固定,但每个 value 的类型都一样"的场景,比如 GeoJSON <code>properties</code> 字段(key 是任意字符串,value 类型不确定就用 <code>unknown</code>):<code>Record&lt;string, unknown&gt;</code>。
+</p>
+
+<h2>组合使用</h2>
+<p>工具类型可以叠加,比如"只挑两个字段,并且都设为可选":</p>
+<pre><code>type LayerPatch = Partial&lt;Pick&lt;LayerConfig, "visible" | "sourceUrl"&gt;&gt;;
+// 等价于 { visible?: boolean; sourceUrl?: string; }</code></pre>
+
+<h2>小测验</h2>
+
+<div class="quiz" data-answer="1">
+  <div class="quiz-question">1. <code>Partial&lt;LayerConfig&gt;</code> 对 <code>LayerConfig</code> 做了什么?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">删除所有字段</button>
+    <button class="quiz-option" data-index="1">把每个字段都变成可选(加 ?)</button>
+    <button class="quiz-option" data-index="2">把每个字段都变成 readonly</button>
+    <button class="quiz-option" data-index="3">只保留第一个字段</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="2">
+  <div class="quiz-question">2. <code>Pick&lt;LayerConfig, "name" | "visible"&gt;</code> 和 <code>Omit&lt;LayerConfig, "sourceUrl"&gt;</code>(假设 LayerConfig 只有这三个字段)之间的关系是?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">完全无关,结果类型不一样</button>
+    <button class="quiz-option" data-index="1">Pick 的结果字段更多</button>
+    <button class="quiz-option" data-index="2">在这个例子里两者结果等价,只是表达方式相反(留下 vs 排除)</button>
+    <button class="quiz-option" data-index="3">Omit 会让字段变成可选,Pick 不会</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="0">
+  <div class="quiz-question">3. <code>Record&lt;string, unknown&gt;</code> 最适合用来描述什么场景?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">key 的具体名字不固定,但每个 value 类型一致(比如 GeoJSON properties)</button>
+    <button class="quiz-option" data-index="1">一个固定字段数量、每个字段类型都不同的 interface</button>
+    <button class="quiz-option" data-index="2">数组类型</button>
+    <button class="quiz-option" data-index="3">class 的抽象方法声明</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<h2>动手练一下</h2>
+<p>在 <a href="https://www.typescriptlang.org/play" target="_blank" rel="noopener">TypeScript Playground</a> 里:</p>
+<pre><code>interface LayerConfig {
+  name: string;
+  visible: boolean;
+  sourceUrl: string;
+}
+
+function updateLayer(id: string, changes: Partial&lt;LayerConfig&gt;): void {
+  console.log(id, changes);
+}
+
+updateLayer("roads", { visible: false });</code></pre>
+<p>
+跑通之后自己试着:1) 写一个 <code>type LayerSummary = Pick&lt;LayerConfig, "name" | "visible"&gt;</code>,声明一个变量试试少写或多写字段会不会报错;2) 写一个 <code>Readonly&lt;LayerConfig&gt;</code> 变量,试着修改其中一个字段,看 TS 报什么错;3) 试着组合 <code>Partial&lt;Pick&lt;LayerConfig, "visible" | "sourceUrl"&gt;&gt;</code>,想一想它和直接写 <code>Partial&lt;LayerConfig&gt;</code> 的区别是什么。
+</p>
+
+<h2>参考资料</h2>
+<ul>
+<li><a href="https://www.typescriptlang.org/docs/handbook/utility-types.html">TypeScript Handbook · Utility Types</a> —— 本课核心内容的官方原文,还有更多没讲到的工具类型(比如 <code>Exclude</code>、<code>Extract</code>、<code>ReturnType</code>)。</li>
+<li><a href="../reference/utility-types-cheatsheet.html">速查表:工具类型</a> —— 本课内容压缩版。</li>
+</ul>
+
+<div class="callout">
+<div class="callout-title">卡住了?</div>
+<code>Partial</code>/<code>Pick</code>/<code>Omit</code> 这几个工具类型怎么选、组合使用怎么读,随时问我。
+</div>
+
+<div class="nav-links">
+  <span>上一课:<a href="0005-generics-basics.html">泛型入门</a></span>
+  <span>下一课:<a href="0007-type-assertion-and-enum.html">类型断言(as)与枚举(enum)</a></span>
+</div>
+
+</div>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

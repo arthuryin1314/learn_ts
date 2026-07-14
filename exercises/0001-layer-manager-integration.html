@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>综合练习一 · 图层管理器</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">综合练习 1</span>
+<h1>图层管理器</h1>
+<p class="subtitle">目标:把前七课(interface、联合类型收窄、class/抽象类、泛型、工具类型、类型断言、enum)拼进同一个小系统里,检验能不能组合使用,不是学新概念。</p>
+
+<h2>背景</h2>
+<p>
+做一个简化版的地图图层管理器:能装不同类型的图层(矢量/栅格),能批量渲染,能局部更新配置,能从"外部数据源"(模拟成 <code>unknown</code>)加载图层配置。
+</p>
+
+<h2>要求</h2>
+
+<h3>1. 用 enum 定义图层类型</h3>
+<p>定义一个字符串枚举 <code>LayerKind</code>,包含 <code>Vector</code>、<code>Raster</code> 两种取值。</p>
+
+<h3>2. 用抽象类定义图层基类(第四课)</h3>
+<p>
+<code>MapLayer</code> 是抽象类,至少包含:<code>name: string</code>、<code>kind: LayerKind</code>、抽象方法 <code>render(): void</code>。用参数属性简写声明字段。
+</p>
+
+<h3>3. 写两个具体子类</h3>
+<p>
+<code>VectorLayer</code> 和 <code>RasterLayer</code> 继承 <code>MapLayer</code>,各自实现 <code>render()</code>,并各自带一个私有字段(比如 <code>VectorLayer</code> 的 <code>sourceUrl</code>,<code>RasterLayer</code> 的 <code>opacity</code>)。构造函数里要正确处理 <code>super()</code> 调用顺序。
+</p>
+
+<h3>4. 用泛型 class 写一个分组容器(第五课)</h3>
+<p>
+<code>LayerGroup&lt;T extends MapLayer&gt;</code>,包含 <code>add(layer: T): void</code> 和 <code>renderAll(): void</code>(遍历调用每个图层的 <code>render()</code>——这里会用到抽象类的多态)。
+</p>
+
+<h3>5. 用联合类型 + 收窄写一个"打印图层详情"的函数(第三课)</h3>
+<p>
+写一个函数,参数类型是 <code>VectorLayer | RasterLayer</code>,内部用 <code>kind</code> 字段(或者 <code>instanceof</code>)判断具体类型,分别打印不同的详情(矢量图层打印 <code>sourceUrl</code>,栅格图层打印 <code>opacity</code>)。
+</p>
+
+<h3>6. 用工具类型写一个"更新配置"的函数(第六课)</h3>
+<p>
+定义一个 <code>LayerConfig</code> interface(包含 <code>name</code>、<code>visible</code> 两个字段),写一个函数 <code>updateConfig(current: LayerConfig, changes: Partial&lt;LayerConfig&gt;): LayerConfig</code>,返回合并后的新配置(提示:可以用对象展开 <code>{ ...current, ...changes }</code>)。
+</p>
+
+<h3>7. 用类型断言写一个"从外部数据源加载配置"的函数(第七课)</h3>
+<p>
+写一个函数 <code>loadConfigFromSource(): unknown</code>,内部随便 <code>return</code> 一个符合 <code>LayerConfig</code> 形状的对象。调用处用 <code>as LayerConfig</code> 断言,再传给 <code>updateConfig</code> 用。
+</p>
+
+<h2>验收标准</h2>
+<p>最终应该能跑通类似这样的调用(不要求一字不差,能表达出同样的组合关系就算达标):</p>
+<pre><code>const vectorGroup = new LayerGroup&lt;VectorLayer&gt;();
+vectorGroup.add(new VectorLayer("roads", LayerKind.Vector, "/data/roads.geojson"));
+vectorGroup.renderAll();
+
+const rasterGroup = new LayerGroup&lt;RasterLayer&gt;();
+rasterGroup.add(new RasterLayer("dem", LayerKind.Raster, 0.8));
+rasterGroup.renderAll();
+
+describeLayer(new VectorLayer("roads", LayerKind.Vector, "/data/roads.geojson"));
+describeLayer(new RasterLayer("dem", LayerKind.Raster, 0.8));
+
+const raw = loadConfigFromSource();
+const config = raw as LayerConfig;
+const updated = updateConfig(config, { visible: false });
+console.log(updated);</code></pre>
+
+<details class="reveal">
+<summary>卡住了?点开看提示(不是答案)</summary>
+<p>
+1. 抽象类的字段和泛型约束的字段要对得上——<code>LayerGroup&lt;T extends MapLayer&gt;</code> 里的 <code>T</code> 就是 <code>MapLayer</code> 或它的子类。<br/>
+2. 子类 constructor 里参数顺序随意,但记得 <code>super(name, kind)</code> 之类的调用必须在使用 <code>this</code> 之前。<br/>
+3. 第 5 步判断具体类型,可以用 <code>instanceof VectorLayer</code>,也可以在 <code>MapLayer</code> 上加一个 <code>kind</code> 字段用 <code>if (layer.kind === LayerKind.Vector)</code> 判断——两种都行,想想哪种更符合"可辨识联合"的思路。<br/>
+4. 第 7 步的 <code>unknown</code> 是故意的,模拟"从外部拿到的数据,TS 不知道具体类型",这样才有理由用 <code>as</code>。
+</p>
+</details>
+
+<p>
+写完之后把你的代码贴给我,我们一起过一遍——重点看有没有正确组合使用这几个概念,而不是语法本身对不对。
+</p>
+
+<div class="nav-links">
+  <span>上一课:<a href="../lessons/0007-type-assertion-and-enum.html">类型断言(as)与枚举(enum)</a></span>
+  <span>下一课:待定</span>
+</div>
+
+</div>
+</body>
+</html>

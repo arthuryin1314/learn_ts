@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>第五课 · 泛型入门</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">第 5 课</span>
+<h1>泛型入门</h1>
+<p class="subtitle">目标:能读懂并写出泛型函数、泛型接口、泛型 class,理解它们比 <code>any</code> 好在哪。</p>
+
+<h2>问题:怎么写一个"对任何类型都适用"的函数</h2>
+<p>
+假设要写一个"原样返回"的函数,不管传进来什么类型。第一反应可能是用 <code>any</code>:
+</p>
+<pre><code>function identity(value: any): any {
+  return value;
+}
+
+const x = identity("hello");
+x.toFixed(2); // 不报错!但运行时会崩溃,因为 x 实际是字符串,没有 toFixed 方法</code></pre>
+<p>
+问题在于:用了 <code>any</code>,TS 就彻底放弃了对这个值的类型跟踪——传进去是 <code>string</code>,返回值也应该还是 <code>string</code>,但 TS 完全不知道,所以 <code>x.toFixed(2)</code> 这种"把字符串当数字用"的错误在编译期查不出来,只能等运行时崩。这正是 [[0003-compile-time-vs-runtime-understood]] 里讲过的——一旦标成 <code>any</code>,编译期的保护就没了。
+</p>
+
+<h2>泛型函数:把"类型"也当参数传</h2>
+<p>泛型解决的就是这个问题——用一个类型占位符(通常叫 <code>T</code>),让 TS 记住"传进去的是什么类型,返回的就是什么类型":</p>
+<pre><code>function identity&lt;T&gt;(value: T): T {
+  return value;
+}
+
+const y = identity("hello"); // TS 自动推断 T 是 string,y 的类型就是 string
+y.toFixed(2); // 报错:Property 'toFixed' does not exist on type 'string'.
+
+const z = identity(42);      // 这次 T 被推断成 number
+z.toFixed(2);                // 合法</code></pre>
+<p>
+<code>&lt;T&gt;</code> 里的 <code>T</code> 不是关键字,只是个占位符名字(习惯上叫 <code>T</code>,也可以叫别的,比如 <code>TValue</code>)。调用的时候你不用手动写 <code>identity&lt;string&gt;("hello")</code>,TS 会根据实参自动推断出 <code>T</code> 是什么——这叫<strong>类型推断</strong>(type inference)。
+</p>
+
+<h2>泛型约束:用 extends 限制 T 必须满足什么条件</h2>
+<p>
+有时候不能让 <code>T</code> 是任意类型——比如下面这个函数需要用到 <code>.length</code>,就必须约束 <code>T</code> 得有 <code>length</code> 属性:
+</p>
+<pre><code>interface HasLength {
+  length: number;
+}
+
+function logLength&lt;T extends HasLength&gt;(value: T): T {
+  console.log(value.length);
+  return value;
+}
+
+logLength("hello");   // 合法,字符串有 length
+logLength([1, 2, 3]); // 合法,数组有 length
+logLength(42);         // 报错:number 不满足 HasLength 约束,没有 length 属性</code></pre>
+<p>
+<code>&lt;T extends HasLength&gt;</code> 读作"T 可以是任何类型,但必须满足 HasLength 这个形状"——注意这里的 <code>extends</code> 和 class 继承的 <code>extends</code> 不是一回事,在泛型里它表示"约束/必须满足",不是"继承自"。
+</p>
+
+<h2>泛型接口:结合第三课的 GeoJSON Feature</h2>
+<p>回忆第三课的 <code>PointFeature</code>/<code>LineFeature</code>,如果 geometry 的类型能作为参数传入,一个 interface 就能覆盖所有 Feature:</p>
+<pre><code>interface Feature&lt;G&gt; {
+  type: "Feature";
+  geometry: G;
+  properties: Record&lt;string, unknown&gt;;
+}
+
+interface PointGeometry {
+  type: "Point";
+  coordinates: [number, number];
+}
+
+const pointFeature: Feature&lt;PointGeometry&gt; = {
+  type: "Feature",
+  geometry: { type: "Point", coordinates: [116.4, 39.9] },
+  properties: { name: "天安门" },
+};
+
+pointFeature.geometry.coordinates; // TS 知道这是 [number, number],不是 any</code></pre>
+<p>
+不用泛型的话,要么给每种 geometry 单独写一个 <code>PointFeature</code>/<code>LineFeature</code> interface(第三课的做法,适合"种类固定、不太会变"的场景),要么 <code>geometry</code> 只能标成 <code>any</code> 丢失类型信息。泛型让"Feature 的外壳"复用同一份定义,只在使用时告诉 TS geometry 具体是什么。
+</p>
+
+<h2>泛型 class:结合第四课的 MapLayer</h2>
+<p>泛型也能用在 class 上,结合第四课的抽象类,写一个"只能装某一种图层"的分组:</p>
+<pre><code>class LayerGroup&lt;T extends MapLayer&gt; {
+  private layers: T[] = [];
+
+  add(layer: T): void {
+    this.layers.push(layer);
+  }
+
+  renderAll(): void {
+    for (const layer of this.layers) {
+      layer.render();
+    }
+  }
+}
+
+const vectorGroup = new LayerGroup&lt;VectorLayer&gt;();
+vectorGroup.add(new VectorLayer("roads", true, "/data/roads.geojson"));
+vectorGroup.add(new RasterLayer("lake", true, "/data/lake.geojson"));
+// 报错!Argument of type 'RasterLayer' is not assignable to parameter of type 'VectorLayer'.</code></pre>
+<p>
+<code>new LayerGroup&lt;VectorLayer&gt;()</code> 相当于告诉 TS:"这个分组的 T 就是 VectorLayer",于是 <code>add</code> 方法的参数类型也跟着变成 <code>VectorLayer</code>——试图塞一个 <code>RasterLayer</code> 进去就会报错。这就是泛型 class 的价值:同一份 <code>LayerGroup</code> 代码,可以配出"只装矢量图层的分组"、"只装栅格图层的分组",而不用为每种图层类型重写一遍分组逻辑。
+</p>
+
+<h2>小测验</h2>
+
+<div class="quiz" data-answer="2">
+  <div class="quiz-question">1. 泛型函数 <code>identity&lt;T&gt;(value: T): T</code> 相比 <code>identity(value: any): any</code>,好在哪?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">运行速度更快</button>
+    <button class="quiz-option" data-index="1">可以接受更多种类型的参数</button>
+    <button class="quiz-option" data-index="2">返回值会保留传入时的具体类型,后续使用能被 TS 检查</button>
+    <button class="quiz-option" data-index="3">不需要写返回值类型标注</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="1">
+  <div class="quiz-question">2. <code>function logLength&lt;T extends HasLength&gt;(value: T): T</code> 里的 <code>extends</code> 是什么意思?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">T 必须是 HasLength 的子类(class 继承关系)</button>
+    <button class="quiz-option" data-index="1">T 可以是任意类型,但必须满足 HasLength 描述的形状(有 length 属性)</button>
+    <button class="quiz-option" data-index="2">T 会被自动转换成 HasLength 类型</button>
+    <button class="quiz-option" data-index="3">调用时必须显式传入 HasLength 作为参数</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="0">
+  <div class="quiz-question">3. <code>const vectorGroup = new LayerGroup&lt;VectorLayer&gt;();</code> 之后,<code>vectorGroup.add(...)</code> 方法的参数类型是什么?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">VectorLayer——T 在这个实例上被固定成了 VectorLayer</button>
+    <button class="quiz-option" data-index="1">MapLayer——T 恒等于泛型约束本身</button>
+    <button class="quiz-option" data-index="2">any——泛型实例化后类型信息会丢失</button>
+    <button class="quiz-option" data-index="3">RasterLayer——因为它也是 MapLayer 的子类</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<h2>动手练一下</h2>
+<p>在 <a href="https://www.typescriptlang.org/play" target="_blank" rel="noopener">TypeScript Playground</a> 里,把第四课写的 <code>MapLayer</code>/<code>VectorLayer</code>/<code>RasterLayer</code> 粘贴进去,再加上这节课的 <code>LayerGroup&lt;T&gt;</code>:</p>
+<pre><code>const vectorGroup = new LayerGroup&lt;VectorLayer&gt;();
+vectorGroup.add(new VectorLayer("roads", true, "/data/roads.geojson"));
+vectorGroup.renderAll();</code></pre>
+<p>
+跑通之后自己试着:1) 故意把一个 <code>RasterLayer</code> 塞进 <code>vectorGroup.add(...)</code>,确认 TS 会报错;2) 再声明一个 <code>const mixedGroup = new LayerGroup&lt;MapLayer&gt;();</code>,试试它是不是矢量、栅格图层都能装——想一想为什么。
+</p>
+
+<h2>参考资料</h2>
+<ul>
+<li><a href="https://www.typescriptlang.org/docs/handbook/2/generics.html">TypeScript Handbook · Generics</a> —— 本课核心内容的官方原文。</li>
+<li><a href="../reference/generics-cheatsheet.html">速查表:泛型入门</a> —— 本课内容压缩版。</li>
+</ul>
+
+<div class="callout">
+<div class="callout-title">卡住了?</div>
+<code>T</code> 到底代表什么、泛型约束怎么写、泛型 class 实例化之后类型去哪了,随时问我。
+</div>
+
+<div class="nav-links">
+  <span>上一课:<a href="0004-classes-and-access-modifiers.html">Class 语法基础与 TS 的类型能力</a></span>
+  <span>下一课:<a href="0006-utility-types-basics.html">工具类型(Utility Types)</a></span>
+</div>
+
+</div>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>速查表 · Class 语法与访问修饰符</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">速查表</span>
+<h1>Class 语法与访问修饰符</h1>
+<p class="subtitle">配合《<a href="../lessons/0004-classes-and-access-modifiers.html">Class 语法基础与 TS 的类型能力</a>》食用</p>
+
+<h2>JS class 基础</h2>
+<pre><code>class MapLayer {
+  constructor(name, visible) {
+    this.name = name;
+    this.visible = visible;
+  }
+  toggle() {
+    this.visible = !this.visible;
+  }
+}
+
+class VectorLayer extends MapLayer {
+  constructor(name, visible, sourceUrl) {
+    super(name, visible); // 必须先调用 super()
+    this.sourceUrl = sourceUrl;
+  }
+}
+</code></pre>
+
+<h2>访问修饰符(编译期,运行时会被擦除)</h2>
+<pre><code>class MapLayer {
+  public name: string;        // 默认,任何地方都能访问
+  private visible: boolean;   // 只能在本类内部访问
+  protected sourceUrl: string; // 本类 + 子类可访问
+}
+</code></pre>
+
+<h2>参数属性(简写)</h2>
+<pre><code>class MapLayer {
+  constructor(
+    public name: string,
+    private visible: boolean
+  ) {}
+  // 等价于手写字段声明 + constructor 里的 this.xxx = xxx
+}
+</code></pre>
+
+<h2>抽象类(abstract)</h2>
+<pre><code>abstract class MapLayer {
+  abstract render(): void;   // 只有签名,子类必须实现
+  describe(): void { /* 普通方法,可以有实现,直接继承 */ }
+}
+
+class VectorLayer extends MapLayer {
+  render(): void { /* 具体实现 */ }
+}
+
+new MapLayer();       // 报错:不能实例化抽象类
+new VectorLayer();    // 合法
+</code></pre>
+
+<h2>implements(实现 interface)</h2>
+<pre><code>interface Renderable {
+  render(): void;
+}
+
+class RasterLayer implements Renderable {
+  render(): void { /* 必须实现,否则报错 */ }
+}
+</code></pre>
+
+<div class="callout">
+<div class="callout-title">记住</div>
+<code>private</code>/<code>protected</code>/<code>readonly</code> 都只是编译期的约定,编译成 JS 后会被擦除,运行时和普通属性没有区别。真正运行时私有要用 JS 原生的 <code>#field</code> 语法。
+</div>
+
+<p class="note">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/classes.html">TypeScript Handbook · Classes</a></p>
+
+</div>
+</body>
+</html>

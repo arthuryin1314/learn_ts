@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>速查表 · 工具类型</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">速查表</span>
+<h1>工具类型(Utility Types)</h1>
+<p class="subtitle">配合《<a href="../lessons/0006-utility-types-basics.html">工具类型(Utility Types)</a>》食用</p>
+
+<h2>Partial&lt;T&gt; / Required&lt;T&gt;</h2>
+<pre><code>interface LayerConfig {
+  name: string;
+  visible: boolean;
+  sourceUrl: string;
+}
+
+type Patch = Partial&lt;LayerConfig&gt;;  // 所有字段变可选
+type Full  = Required&lt;LayerConfig&gt;; // 所有字段变必填
+</code></pre>
+
+<h2>Pick&lt;T, K&gt; / Omit&lt;T, K&gt;</h2>
+<pre><code>type Summary = Pick&lt;LayerConfig, "name" | "visible"&gt;; // 只留下这几个字段
+type NoSource = Omit&lt;LayerConfig, "sourceUrl"&gt;;       // 排除这几个字段
+</code></pre>
+
+<h2>Readonly&lt;T&gt;</h2>
+<pre><code>type Frozen = Readonly&lt;LayerConfig&gt;; // 所有字段变 readonly
+</code></pre>
+
+<h2>Record&lt;K, V&gt;</h2>
+<pre><code>const visibility: Record&lt;string, boolean&gt; = { roads: true, lake: false };
+// key 名字不固定,但每个 value 类型统一
+</code></pre>
+
+<h2>组合</h2>
+<pre><code>type LayerPatch = Partial&lt;Pick&lt;LayerConfig, "visible" | "sourceUrl"&gt;&gt;;
+// 先 Pick 出两个字段,再整体 Partial
+</code></pre>
+
+<div class="callout">
+<div class="callout-title">记住</div>
+这些工具类型不产生新数据,只是"从已有类型的字段列表派生新的字段列表",本质上是编译期的类型运算。
+</div>
+
+<p class="note">来源:<a href="https://www.typescriptlang.org/docs/handbook/utility-types.html">TypeScript Handbook · Utility Types</a></p>
+
+</div>
+</body>
+</html>

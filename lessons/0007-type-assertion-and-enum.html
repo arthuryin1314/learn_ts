@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>第七课 · 类型断言(as)与枚举(enum)</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">第 7 课</span>
+<h1>类型断言(as)与枚举(enum)</h1>
+<p class="subtitle">目标:知道 <code>as</code> 什么时候该用、什么时候是在骗 TS;知道 <code>enum</code> 和字符串联合类型的区别,以及 <code>enum</code> 为什么和之前学的类型不一样——它在运行时是真实存在的。</p>
+
+<h2>类型断言(as):告诉 TS "相信我,这是这个类型"</h2>
+<p>
+第三课讲过类型收窄——TS 通过 <code>if</code>/<code>typeof</code> 等运行时检查自己判断出更精确的类型。但有些场景 TS 没办法自己推断出来,你比 TS 更清楚这个值实际是什么类型,这时候用 <code>as</code> 手动告诉 TS:
+</p>
+<pre><code>function loadConfig(): unknown {
+  return JSON.parse('{"name":"roads","visible":true,"sourceUrl":"/data/roads.geojson"}');
+}
+
+const raw = loadConfig();
+raw.name; // 报错:Object is of type 'unknown'.
+
+const config = raw as { name: string; visible: boolean; sourceUrl: string };
+config.name; // 合法,TS 现在认为 config 是这个形状</code></pre>
+<p>
+<code>as</code> <strong>只在编译期起作用</strong>,不会做任何运行时的检查或转换——它不像其他语言里的"类型转换"会真的改变值。如果断言错了,TS 编译期不会报错,但运行时可能直接崩:
+</p>
+<pre><code>const raw2 = loadConfig();
+const wrong = raw2 as { elevation: number };
+wrong.elevation.toFixed(2); // 编译期不报错,运行时崩:Cannot read properties of undefined</code></pre>
+<div class="callout">
+<div class="callout-title">和第三课的收窄是相反的思路</div>
+类型收窄是"用运行时检查换取 TS 的信任",<code>as</code> 是"不做检查,直接要求 TS 信任你"。能用收窄的地方优先用收窄,<code>as</code> 留给 TS 确实推断不出来、但你有充分把握(比如 <code>JSON.parse</code> 的返回值、DOM 查询结果)的场景。
+</div>
+
+<h2>as const:让 TS 推断出最精确的字面量类型</h2>
+<pre><code>const status1 = "active";       // 类型推断为 string
+const status2 = "active" as const; // 类型推断为字面量类型 "active"
+
+let layerType = "vector";        // 类型是 string,后面可以随便改成别的字符串
+const layerTypeConst = "vector" as const; // 类型是 "vector",不能再赋别的值</code></pre>
+<p>
+<code>as const</code> 常用在需要精确字面量类型的场景,比如给可辨识联合的 <code>type</code> 字段做标注,或者防止数组/对象被意外改动(<code>as const</code> 会让数组变成 readonly 元组)。
+</p>
+
+<h2>枚举(enum):一组命名常量</h2>
+<p>如果一个字段只能取几个固定值中的一个,之前的做法是字符串联合类型:</p>
+<pre><code>type LayerKind = "vector" | "raster" | "tile";
+const kind: LayerKind = "vector";</code></pre>
+<p>TS 还提供了专门的语法 <code>enum</code>:</p>
+<pre><code>enum LayerKind {
+  Vector,
+  Raster,
+  Tile,
+}
+
+const kind: LayerKind = LayerKind.Vector;
+console.log(kind); // 0 —— 数字枚举默认从 0 开始编号</code></pre>
+<p>也可以用字符串枚举,值更直观、调试时更好读:</p>
+<pre><code>enum LayerKind {
+  Vector = "vector",
+  Raster = "raster",
+  Tile = "tile",
+}
+
+const kind: LayerKind = LayerKind.Vector;
+console.log(kind); // "vector"</code></pre>
+
+<h2>关键区别:enum 在运行时是真实存在的对象</h2>
+<p>
+之前学的 <code>interface</code>、类型别名、泛型标注,编译成 JS 之后全部被<strong>擦除</strong>(参考第一课/第四课)。但 <code>enum</code> 不一样,它会被编译成一个真实的 JS 对象:
+</p>
+<pre><code>enum LayerKind {
+  Vector = "vector",
+  Raster = "raster",
+}
+
+// 编译后大致相当于:
+// const LayerKind = { Vector: "vector", Raster: "raster" };
+
+Object.values(LayerKind); // ["vector", "raster"] —— 运行时真的能这样用</code></pre>
+<p>
+这也是为什么很多团队更倾向用字符串联合类型而不是 <code>enum</code>:联合类型是纯编译期概念,零运行时开销;<code>enum</code> 会往编译产物里加真实代码。两种方式都能达到"限制取值范围"的效果,<code>enum</code> 额外多了"运行时可以遍历/引用这个对象"的能力,但也多了一点运行时体积。
+</p>
+
+<h2>小测验</h2>
+
+<div class="quiz" data-answer="1">
+  <div class="quiz-question">1. <code>const config = raw as { name: string };</code> 如果 <code>raw</code> 实际运行时的值根本没有 <code>name</code> 字段,会发生什么?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">编译期直接报错,阻止你写出这段代码</button>
+    <button class="quiz-option" data-index="1">编译期不报错,运行时访问 config.name 可能是 undefined 或直接出错</button>
+    <button class="quiz-option" data-index="2">TS 会自动在运行时补上一个默认的 name 字段</button>
+    <button class="quiz-option" data-index="3">as 会自动帮你检查并抛出异常</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="0">
+  <div class="quiz-question">2. 类型收窄(第三课的 if/typeof)和类型断言(as)最主要的区别是什么?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">收窄是运行时真的做了检查换来的信任,as 是没检查、直接要求 TS 信任</button>
+    <button class="quiz-option" data-index="1">收窄只能用在 union 类型上,as 可以用在任何类型上,除此没有区别</button>
+    <button class="quiz-option" data-index="2">as 比收窄更安全</button>
+    <button class="quiz-option" data-index="3">两者完全等价,只是写法不同</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="2">
+  <div class="quiz-question">3. <code>enum</code> 和字符串联合类型(<code>type LayerKind = "vector" | "raster"</code>)相比,最本质的区别是什么?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">enum 编译期检查更严格</button>
+    <button class="quiz-option" data-index="1">字符串联合类型不能用在 switch 里</button>
+    <button class="quiz-option" data-index="2">enum 编译后是运行时真实存在的对象,联合类型编译后完全被擦除</button>
+    <button class="quiz-option" data-index="3">enum 只能用数字,不能用字符串</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<h2>动手练一下</h2>
+<p>在 <a href="https://www.typescriptlang.org/play" target="_blank" rel="noopener">TypeScript Playground</a> 里:</p>
+<pre><code>enum LayerKind {
+  Vector = "vector",
+  Raster = "raster",
+  Tile = "tile",
+}
+
+function describeLayer(kind: LayerKind): string {
+  return `图层类型:${kind}`;
+}
+
+console.log(describeLayer(LayerKind.Vector));
+
+const raw: unknown = { name: "roads", visible: true };
+const config = raw as { name: string; visible: boolean };
+console.log(config.name);</code></pre>
+<p>
+跑通之后自己试着:1) 用 <code>Object.values(LayerKind)</code> 打印出所有枚举值,确认它在运行时是真实的对象;2) 把 <code>as { name: string; visible: boolean }</code> 故意断言成一个多出一个不存在字段的类型(比如加个 <code>elevation: number</code>),看编译期是否报错,再访问这个字段看运行时会怎样;3) 试着把上面的 <code>enum</code> 改写成字符串联合类型 <code>type LayerKind = "vector" | "raster" | "tile"</code>,想一想哪些地方的写法需要跟着改。
+</p>
+
+<h2>参考资料</h2>
+<ul>
+<li><a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#type-assertions">TypeScript Handbook · Type Assertions</a></li>
+<li><a href="https://www.typescriptlang.org/docs/handbook/enums.html">TypeScript Handbook · Enums</a></li>
+<li><a href="../reference/type-assertion-enum-cheatsheet.html">速查表:类型断言与枚举</a> —— 本课内容压缩版。</li>
+</ul>
+
+<div class="callout">
+<div class="callout-title">卡住了?</div>
+<code>as</code> 什么时候该用、<code>enum</code> 和联合类型怎么选,随时问我。
+</div>
+
+<div class="nav-links">
+  <span>上一课:<a href="0006-utility-types-basics.html">工具类型(Utility Types)</a></span>
+  <span>下一课:待定</span>
+</div>
+
+</div>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>
