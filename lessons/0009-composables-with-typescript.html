@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>第九课 · 组合式函数(Composables)与 TypeScript</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">第 9 课</span>
+<h1>组合式函数(Composables)与 TypeScript</h1>
+<p class="subtitle">目标:知道什么时候该把组件里的逻辑抽成 composable;会写一个带 TS 类型的 composable;知道 TS 怎么推断 composable 的返回类型。</p>
+
+<h2>Composable 是什么</h2>
+<p>
+你在综合练习二里写的 <code>App.vue</code>,<code>&lt;script setup&gt;</code> 里有两件事混在一起:渲染逻辑(怎么展示图层列表)和状态逻辑(图层数组怎么维护、怎么更新)。现在两件事加起来不到 15 行,看起来没问题。但如果你以后多了"添加图层"、"删除图层"、"按可见性过滤"等操作,<code>App.vue</code> 就会越来越臃肿,而且如果另一个组件也需要操作同一份图层数据,这些逻辑就要复制粘贴一遍。
+</p>
+<p>
+Composable 就是解决这个问题的:把"和渲染无关的状态逻辑"抽成一个独立的 TS 函数,哪个组件需要就在哪里调用。
+</p>
+<pre><code>// src/composables/useLayerList.ts
+import { ref } from 'vue'
+import type { LayerItem } from '@/types/layer'
+
+export function useLayerList() {
+  const layers = ref&lt;LayerItem[]&gt;([
+    { name: '图层1', visible: true, opacity: 0.5 },
+    { name: '图层2', visible: false, opacity: 0.8 },
+    { name: '图层3', visible: true, opacity: 1 },
+  ])
+
+  function toggleVisible(index: number, value: boolean) {
+    layers.value[index].visible = value
+  }
+
+  return { layers, toggleVisible }
+}</code></pre>
+<p>在组件里用:</p>
+<pre><code>&lt;script setup lang="ts"&gt;
+import { useLayerList } from '@/composables/useLayerList'
+
+const { layers, toggleVisible } = useLayerList()
+&lt;/script&gt;</code></pre>
+<p>
+<code>App.vue</code> 里原来的 <code>ref</code>、数组初始数据、<code>handleToggleVisible</code> 函数全部消失,换成这一行。模板部分完全不用改,因为 <code>layers</code> 和 <code>toggleVisible</code> 的名字和类型没变。
+</p>
+
+<h2>命名约定:use 前缀</h2>
+<p>
+Composable 的函数名固定以 <code>use</code> 开头,比如 <code>useLayerList</code>、<code>useMousePosition</code>、<code>useFetch</code>。这不是语法强制,而是 Vue 社区约定——Vue 内部的 API(比如 <code>ref</code>、<code>computed</code>)也是这个前缀。好处是:一眼看到 <code>use</code> 开头的函数,就知道它内部可能有响应式状态、可能用了 Vue 的组合式 API,和普通工具函数区分开。
+</p>
+
+<h2>TypeScript 怎么处理 composable 的返回类型</h2>
+<p>
+大多数情况下 TS 能自动推断 composable 的返回类型,不需要你手动标注。以上面的 <code>useLayerList</code> 为例,TS 会自动推断出它返回:
+</p>
+<pre><code>{
+  layers: Ref&lt;LayerItem[]&gt;,
+  toggleVisible: (index: number, value: boolean) =&gt; void
+}</code></pre>
+<p>
+所以在组件里解构出来的 <code>layers</code> 和 <code>toggleVisible</code>,TS 已经知道它们各自的类型,不需要再单独标注。
+</p>
+<p>
+什么时候需要手动写返回类型?当 composable 逻辑复杂、推断结果不准确,或者你想明确约束"这个函数只能返回这些东西"时,可以显式标注:
+</p>
+<pre><code>interface UseLayerListReturn {
+  layers: Ref&lt;LayerItem[]&gt;
+  toggleVisible: (index: number, value: boolean) =&gt; void
+}
+
+export function useLayerList(): UseLayerListReturn {
+  // ...
+}</code></pre>
+<p>
+但对于普通的 composable,依赖 TS 的自动推断就够了,不用每个都手动写返回类型 interface。
+</p>
+
+<div class="callout">
+<div class="callout-title">Composable 和普通函数的区别</div>
+普通工具函数(比如格式化日期的 <code>formatDate()</code>)里不会有 <code>ref</code>/<code>computed</code> 这类 Vue 响应式 API。Composable 里有——它的核心价值是"把响应式状态和操作这个状态的方法打包在一起",让组件拿到的不只是一个计算结果,而是一份"活的"响应式数据。这也是为什么命名用 <code>use</code> 前缀专门区分:提醒调用者"这里面有响应式状态,不只是纯计算"。
+</div>
+
+<h2>什么时候该抽成 composable</h2>
+<p>两个判断标准,满足任意一个就值得抽:</p>
+<ul>
+<li><strong>复用</strong>:同一段逻辑要在 2 个以上的组件里用。</li>
+<li><strong>复杂度</strong>:单个组件的 <code>&lt;script setup&gt;</code> 超过 50-80 行,其中有一块相对独立的逻辑(比如"图层管理"、"表单验证"、"数据请求"),可以考虑单独抽出去,让组件本身只剩"把数据和 UI 连起来"这件事。</li>
+</ul>
+<p>
+不要过度抽取:每个 <code>ref</code> 都抽成 composable 是过度设计。只有当"这块逻辑放在这里让人觉得乱"或者"这块逻辑明显可以在别处复用"时再动手。
+</p>
+
+<h2>小测验</h2>
+
+<div class="quiz" data-answer="2">
+  <div class="quiz-question">1. Composable 函数的命名约定是什么?为什么?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">首字母大写(PascalCase),和 Vue 组件保持一致</button>
+    <button class="quiz-option" data-index="1">全小写加下划线(snake_case),和 TS 类型区分</button>
+    <button class="quiz-option" data-index="2">以 use 开头(camelCase),提醒调用者内部有响应式状态</button>
+    <button class="quiz-option" data-index="3">没有命名约定,随意命名</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="0">
+  <div class="quiz-question">2. 在组件里写 <code>const { layers } = useLayerList()</code>,不给 <code>layers</code> 加任何类型标注,TS 知道 <code>layers</code> 是什么类型吗?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">知道,TS 会从 useLayerList 的返回值自动推断出 layers 的类型</button>
+    <button class="quiz-option" data-index="1">不知道,解构赋值之后类型信息会丢失,需要手动标注</button>
+    <button class="quiz-option" data-index="2">知道,但只有在 composable 里显式写了返回类型 interface 时才能推断</button>
+    <button class="quiz-option" data-index="3">不知道,composable 的返回值默认是 any</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="1">
+  <div class="quiz-question">3. 什么时候适合把组件里的逻辑抽成 composable?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">每个 ref 都应该抽成 composable,这样组件最干净</button>
+    <button class="quiz-option" data-index="1">逻辑需要在多个组件复用,或者组件 script 已经很复杂、其中有相对独立的一块</button>
+    <button class="quiz-option" data-index="2">只有当逻辑超过 200 行时才值得抽</button>
+    <button class="quiz-option" data-index="3">Composable 只用于数据请求,其他逻辑不适合抽</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<h2>动手练一下</h2>
+<p>在你已有的 <code>learn_ts_project</code> 里:</p>
+<ol>
+<li>新建 <code>src/composables/useLayerList.ts</code>,把 <code>App.vue</code> 里的 <code>layers</code> 和 <code>toggleVisible</code> 逻辑搬进去,按本课示例的结构写,记得 <code>export</code>。</li>
+<li>改造 <code>App.vue</code>:删掉原来的 <code>ref</code> 和 <code>handleToggleVisible</code>,换成 <code>const { layers, toggleVisible } = useLayerList()</code>,模板部分不用动。</li>
+<li>确认页面功能和改造之前完全一样(点击按钮仍然能切换可见状态)。</li>
+<li>验证一下 TS 推断:在 <code>App.vue</code> 里,把鼠标悬停在 <code>layers</code> 上,看 IDE 提示的类型是什么——不需要你手动标注,TS 应该已经知道它是 <code>Ref&lt;LayerItem[]&gt;</code>。</li>
+</ol>
+<p>完成之后把 <code>useLayerList.ts</code> 和改造后的 <code>App.vue</code> 贴给我看。</p>
+
+<h2>参考资料</h2>
+<ul>
+<li><a href="https://vuejs.org/guide/reusability/composables.html" target="_blank" rel="noopener">Vue · Composables</a></li>
+<li><a href="https://vuejs.org/guide/typescript/composition-api.html" target="_blank" rel="noopener">Vue · TypeScript with Composition API</a></li>
+</ul>
+
+<div class="nav-links">
+  <span>上一课:<a href="0008-tsconfig-and-vue-integration.html">tsconfig 与 Vue + TypeScript 集成</a></span>
+  <span>下一课:待定(小项目)</span>
+</div>
+
+</div>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

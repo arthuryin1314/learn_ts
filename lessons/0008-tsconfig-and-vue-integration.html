@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>第八课 · tsconfig 与 Vue + TypeScript 集成</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">第 8 课</span>
+<h1>tsconfig 与 Vue + TypeScript 集成</h1>
+<p class="subtitle">目标:看懂一个 <code>tsconfig.json</code> 里关键字段在管什么;知道 Vue 单文件组件(<code>.vue</code>)里怎么给 <code>props</code>/<code>emits</code> 写类型;知道项目里共享类型该放在哪。</p>
+
+<h2>tsconfig.json:TS 编译器的配置文件</h2>
+<p>
+之前七课我们都在 Playground 里写代码,Playground 后台其实也是按一份默认 <code>tsconfig</code> 在跑。真实项目里这份配置是显式写出来的,常见关键字段:
+</p>
+<pre><code>{
+  "compilerOptions": {
+    "target": "ES2020",        // 编译产物用哪个版本的 JS 语法
+    "module": "ESNext",        // 编译产物用哪种模块写法(import/export vs require)
+    "strict": true,            // 开启全部严格类型检查
+    "jsx": "preserve",         // 给 React/Vue 的 JSX 语法用,纯 Vue SFC 项目通常不需要
+    "moduleResolution": "Bundler",
+    "skipLibCheck": true       // 跳过第三方库 .d.ts 文件自身的类型检查,加快编译
+  },
+  "include": ["src/**/*"],     // 哪些文件参与类型检查
+  "exclude": ["node_modules"]
+}</code></pre>
+<p>
+不需要背全部字段,记住几个最影响你日常开发体验的:
+</p>
+<ul>
+<li><code>strict</code> —— 建议新项目从第一天就开 <code>true</code>。它其实是一组检查的总开关(比如禁止隐式 <code>any</code>、变量必须初始化才能用等)。项目起步时开,比写了很多代码后再开容易得多——后补 <code>strict</code> 往往会一次性炸出几十个报错。</li>
+<li><code>include</code>/<code>exclude</code> —— 决定"TS 到底在检查哪些文件"。遇到"明明报错了但 IDE 没提示"或反过来"某个文件不该被检查却被检查了",先看这里。</li>
+<li><code>skipLibCheck</code> —— 第三方库自己的类型定义偶尔有小问题,开启这个可以避免因为别人的 <code>.d.ts</code> 报错卡住你,几乎所有项目都会开。</li>
+</ul>
+
+<div class="callout">
+<div class="callout-title">Vue 项目里常见的多文件拆分</div>
+用 Vite 创建的 Vue+TS 项目,通常不是一份 <code>tsconfig.json</code>,而是拆成 <code>tsconfig.json</code>(入口,用 <code>references</code> 指向下面两份)、<code>tsconfig.app.json</code>(你写的组件代码)、<code>tsconfig.node.json</code>(<code>vite.config.ts</code> 这类跑在 Node 环境的配置脚本)。拆开的原因是:浏览器代码和 Node 脚本运行环境不同,能用的全局类型(比如 Node 的 <code>process</code>)也不同,分开检查更准确。你不需要自己设计这个结构,脚手架(<code>npm create vue@latest</code>)会帮你生成好,遇到看不懂的字段回来查这一课就行。
+</div>
+
+<h2>Vue 单文件组件里的 TypeScript</h2>
+<p>
+在 <code>&lt;script&gt;</code> 标签上加 <code>lang="ts"</code>,这个组件里的代码就按 TS 检查:
+</p>
+<pre><code>&lt;script setup lang="ts"&gt;
+import { ref } from 'vue'
+
+interface Props {
+  title: string
+  count?: number
+}
+
+const props = defineProps&lt;Props&gt;()
+
+const emit = defineEmits&lt;{
+  update: [value: number]
+  close: []
+}&gt;()
+
+const localCount = ref&lt;number&gt;(0)
+
+function increment() {
+  localCount.value++
+  emit('update', localCount.value)
+}
+&lt;/script&gt;</code></pre>
+<p>
+几个和你熟悉的"运行时写法"对照一下:
+</p>
+<ul>
+<li><code>defineProps&lt;Props&gt;()</code> —— 用泛型传入一个 <code>interface</code>,比运行时写法 <code>defineProps({ title: String, count: Number })</code> 精确得多,比如 <code>count?: number</code> 里的 <code>?</code> 直接表达"可选",运行时写法要额外写 <code>required: false</code>。</li>
+<li><code>defineEmits&lt;{...}&gt;()</code> —— 每个事件名对应一个"参数元组"(数组形式),<code>update: [value: number]</code> 意思是触发 <code>update</code> 事件时必须带一个 <code>number</code> 参数;<code>close: []</code> 表示这个事件不带参数。写 <code>emit('update', 'abc')</code> 传错类型会直接报错。</li>
+<li><code>ref&lt;number&gt;(0)</code> —— 大多数情况下 TS 能从初始值自动推断类型(<code>ref(0)</code> 已经能推断出 <code>Ref&lt;number&gt;</code>),显式标注主要用在初始值不能表达完整类型的场景,比如 <code>ref&lt;string | null&gt;(null)</code>。</li>
+</ul>
+
+<h2>共享类型放哪:types 目录只是约定,不是强制</h2>
+<p>
+组件内部局部用的类型(比如上面的 <code>Props</code>),就近写在 <code>&lt;script setup&gt;</code> 里,不需要拿出去。当一个类型被多个组件、多个模块共享(比如你的"图层配置" <code>LayerConfig</code>,可能同时被地图组件、图层列表组件、API 请求函数用到),才值得拆到单独文件,常见做法是项目根目录下建 <code>src/types/</code>,按业务概念拆文件(比如 <code>src/types/layer.ts</code>),用 <code>export interface</code>/<code>export type</code> 导出,各处 <code>import type { LayerConfig } from '@/types/layer'</code> 引用。
+</p>
+<p>
+判断要不要拆出去的简单标准:改一下这个类型,要跑去改几个文件的 import?如果只影响一个组件,留在组件里;如果影响三四个地方,拆出去能避免到处复制粘贴同一份字段定义。
+</p>
+
+<h2>为什么 .vue 文件的类型检查工具不是 tsc</h2>
+<p>
+<code>tsc</code>(TS 官方编译器)只认识 <code>.ts</code> 文件,不知道怎么解析 <code>.vue</code> 文件里 <code>&lt;template&gt;</code>、<code>&lt;script&gt;</code>、<code>&lt;style&gt;</code> 混在一起的结构。Vue 官方提供了 <code>vue-tsc</code>,专门先把 <code>.vue</code> 文件"翻译"成 TS 能理解的形式再检查,这也是为什么 Vue+TS 项目的 <code>package.json</code> 里做类型检查的命令通常是 <code>vue-tsc --noEmit</code>,而不是直接用 <code>tsc</code>。IDE 里能有类型提示,靠的是 Volar(Vue 官方 IDE 插件)在背后做同样的事情。
+</p>
+
+<h2>小测验</h2>
+
+<div class="quiz" data-answer="1">
+  <div class="quiz-question">1. 一个已经写了几个月、没开 strict 模式的 TS 项目,现在想把 tsconfig 里的 <code>strict</code> 改成 <code>true</code>,会发生什么?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">不会有任何变化,strict 只影响新写的代码</button>
+    <button class="quiz-option" data-index="1">很可能一次性炸出大量之前被放过的报错(隐式 any、未初始化变量等),需要逐个修</button>
+    <button class="quiz-option" data-index="2">项目会编译失败,无法运行</button>
+    <button class="quiz-option" data-index="3">strict 只对新建文件生效,老文件不受影响</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="0">
+  <div class="quiz-question">2. <code>defineProps&lt;Props&gt;()</code>(泛型写法)相比 <code>defineProps({ title: String })</code>(运行时写法),主要优势是什么?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">能表达更精确的类型,比如可选字段、联合类型、嵌套对象结构,运行时写法很难表达这些</button>
+    <button class="quiz-option" data-index="1">性能更好,组件渲染更快</button>
+    <button class="quiz-option" data-index="2">两者完全等价,只是社区更喜欢泛型写法的外观</button>
+    <button class="quiz-option" data-index="3">泛型写法是 Vue 3.4 之后唯一支持的写法,运行时写法已废弃</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<div class="quiz" data-answer="2">
+  <div class="quiz-question">3. 为什么 Vue 项目做类型检查用 <code>vue-tsc</code> 而不是直接用 <code>tsc</code>?</div>
+  <div class="quiz-options">
+    <button class="quiz-option" data-index="0">tsc 检查速度太慢,vue-tsc 是性能优化版</button>
+    <button class="quiz-option" data-index="1">vue-tsc 是 tsc 的免费替代品,功能完全相同</button>
+    <button class="quiz-option" data-index="2">tsc 不认识 .vue 文件的结构,vue-tsc 会先把 .vue 翻译成 TS 能理解的形式再检查</button>
+    <button class="quiz-option" data-index="3">没有区别,两个命令可以互换使用</button>
+  </div>
+  <div class="quiz-feedback"></div>
+</div>
+
+<h2>动手练一下</h2>
+<p>
+这一课需要一个真实的 Vue 项目环境,Playground 不够用了。如果手头没有现成项目,先起一个:
+</p>
+<pre><code>npm create vue@latest my-ts-practice
+# 勾选 TypeScript,其他选项按默认或按自己喜好
+cd my-ts-practice
+npm install
+npm run dev</code></pre>
+<p>项目建好之后:</p>
+<ol>
+<li>打开 <code>tsconfig.json</code>(或 <code>tsconfig.app.json</code>),找到 <code>strict</code> 字段,确认它是 <code>true</code>。</li>
+<li>在 <code>src/components/</code> 下新建一个 <code>LayerCard.vue</code>,用 <code>&lt;script setup lang="ts"&gt;</code>,定义一个 <code>Props</code> interface(至少包含 <code>name: string</code>、<code>visible: boolean</code>、一个可选字段),用 <code>defineProps&lt;Props&gt;()</code> 接收。</li>
+<li>给这个组件加一个按钮,点击时用 <code>defineEmits</code> 定义并触发一个事件(比如 <code>toggle-visible</code>),带一个 <code>boolean</code> 参数。</li>
+<li>在 <code>App.vue</code> 里引入并使用这个组件,故意传一个类型错误的 prop(比如 <code>visible</code> 传字符串),观察 IDE 或终端里 <code>vue-tsc</code> 报错长什么样。</li>
+</ol>
+<p>跑通之后把你写的 <code>LayerCard.vue</code> 贴给我看看。</p>
+
+<h2>参考资料</h2>
+<ul>
+<li><a href="https://www.typescriptlang.org/tsconfig/" target="_blank" rel="noopener">TypeScript Handbook · tsconfig Reference</a></li>
+<li><a href="https://vuejs.org/guide/typescript/overview.html" target="_blank" rel="noopener">Vue · Using Vue with TypeScript</a></li>
+<li><a href="https://vuejs.org/guide/typescript/composition-api.html" target="_blank" rel="noopener">Vue · TypeScript with Composition API</a></li>
+<li><a href="../reference/tsconfig-vue-cheatsheet.html">速查表:tsconfig 与 Vue 集成</a> —— 本课内容压缩版。</li>
+</ul>
+
+<div class="callout">
+<div class="callout-title">卡住了?</div>
+环境搭建报错(比如 vue-tsc 找不到、依赖装不上)和类型报错是两类不同问题,卡住的时候先说清楚是哪一类,方便定位。
+</div>
+
+<div class="nav-links">
+  <span>上一课:<a href="0007-type-assertion-and-enum.html">类型断言(as)与枚举(enum)</a></span>
+  <span>下一课:待定</span>
+</div>
+
+</div>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

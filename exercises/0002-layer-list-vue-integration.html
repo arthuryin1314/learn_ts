@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>综合练习二 · 图层列表(Vue + TS)</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">综合练习 2</span>
+<h1>图层列表(Vue + TS)</h1>
+<p class="subtitle">目标:把第八课(tsconfig、defineProps/defineEmits、共享类型放哪)在父子组件之间多写几遍,巩固模式,不引入新概念。</p>
+
+<h2>背景</h2>
+<p>
+在你已有的 <code>learn_ts_project</code> 里继续写。做一个简化版"图层列表":<code>App.vue</code> 管理一份图层数据数组,<code>LayerCard.vue</code>(你已经写好一版了)展示单个图层并在用户点击时触发"切换可见性"事件,<code>App.vue</code> 接收事件后更新对应图层在数组里的状态。
+</p>
+
+<h2>要求</h2>
+
+<h3>1. 定义一个共享类型 LayerItem</h3>
+<p>
+包含 <code>name: string</code>、<code>visible: boolean</code>、<code>opacity?: number</code>。想一想:这个类型会被 <code>App.vue</code> 和 <code>LayerCard.vue</code> 同时用到,按第八课讲的判断标准,应该放在组件里还是拆到 <code>src/types/</code> 下?拆的话文件名和 import 路径自己定。
+</p>
+
+<h3>2. 改造 LayerCard.vue,让它显示真实内容</h3>
+<p>
+你之前写的 <code>LayerCard.vue</code> 按钮是空的。现在用 <code>props</code> 把 <code>name</code>、<code>visible</code>、<code>opacity</code> 显示在 <code>&lt;template&gt;</code> 里(比如 <code>&lt;p&gt;{{ name }} - {{ visible ? '可见' : '隐藏' }}&lt;/p&gt;</code>),按钮文字也可以按 <code>visible</code> 动态变化(比如显示"隐藏"或"显示")。<code>Props</code> 直接用 <code>LayerItem</code>(或者继续单独定义,想一下两者取舍)。
+</p>
+
+<h3>3. App.vue 维护一个图层数组</h3>
+<p>
+用 <code>ref&lt;LayerItem[]&gt;([...])</code> 初始化 2-3 条图层数据,用 <code>v-for</code> 渲染多个 <code>LayerCard</code>,记得给 <code>v-for</code> 加 <code>:key</code>。每个 <code>LayerCard</code> 的 props 要从数组里对应的那一项传进去(注意哪些要加 <code>:</code>,哪些不用)。
+</p>
+
+<h3>4. 接收事件,更新数组里对应的那一项</h3>
+<p>
+<code>LayerCard</code> 触发 <code>toggle-visible</code> 时,<code>App.vue</code> 要找到数组里"是哪一个图层"(比如按 <code>name</code> 匹配,或者用下标),把它的 <code>visible</code> 改成事件带过来的新值,而不是把整个数组重新赋值成一份新数据。
+</p>
+
+<h2>验收标准</h2>
+<p>跑起来之后,页面上能看到 2-3 个图层卡片,点击任意一个的按钮,只有那一个卡片的可见状态文字变化,其他不受影响,刷新页面后恢复初始数据(不要求做持久化)。</p>
+
+<details class="reveal">
+<summary>卡住了?点开看提示(不是答案)</summary>
+<p>
+1. <code>v-for</code> 里传 props 给子组件,和之前直接手写一个 <code>&lt;LayerCard name="roads" :visible="true" /&gt;</code> 本质一样,只是值从数组元素里取,比如 <code>:name="layer.name"</code>、<code>:visible="layer.visible"</code>。<br/>
+2. 找到数组里"是哪一个"最简单的办法是 <code>layers.value.findIndex(l =&gt; l.name === xxx)</code>,或者在 <code>v-for</code> 里直接用下标 <code>(layer, index) in layers</code>,事件处理时把 <code>index</code> 一起传出去。<br/>
+3. <code>emit</code> 触发时能不能一次带两个参数?回想第八课 <code>defineEmits</code> 元组语法,一个事件可以对应多个位置的参数,比如 <code>'toggle-visible': [index: number, value: boolean]</code>。<br/>
+4. 更新数组某一项的 <code>visible</code>,不要整个替换数组,只改那一项:<code>layers.value[index].visible = newValue</code> 就够了,Vue 的响应式能追踪到。
+</p>
+</details>
+
+<p>
+写完之后把 <code>LayerCard.vue</code> 和 <code>App.vue</code> 的完整代码贴给我,我们一起看看父子组件之间类型传递有没有对得上。
+</p>
+
+<div class="nav-links">
+  <span>上一课:<a href="../lessons/0008-tsconfig-and-vue-integration.html">tsconfig 与 Vue + TypeScript 集成</a></span>
+  <span>下一课:待定</span>
+</div>
+
+</div>
+</body>
+</html>

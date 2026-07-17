@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>速查表 · tsconfig 与 Vue 集成</title>
+<link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+<div class="page">
+
+<span class="tag">速查表</span>
+<h1>tsconfig 与 Vue + TypeScript 集成</h1>
+<p class="subtitle">配合《<a href="../lessons/0008-tsconfig-and-vue-integration.html">tsconfig 与 Vue + TypeScript 集成</a>》食用</p>
+
+<h2>tsconfig 关键字段</h2>
+<pre><code>{
+  "compilerOptions": {
+    "target": "ES2020",       // 编译产物的 JS 版本
+    "module": "ESNext",       // 编译产物的模块写法
+    "strict": true,           // 严格检查总开关,新项目建议从第一天开
+    "skipLibCheck": true      // 跳过第三方库 .d.ts 自身的类型检查
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}
+</code></pre>
+
+<h2>Vue SFC 里的 props / emits</h2>
+<pre><code>&lt;script setup lang="ts"&gt;
+interface Props {
+  title: string
+  count?: number        // ? 表示可选
+}
+const props = defineProps&lt;Props&gt;()
+
+const emit = defineEmits&lt;{
+  update: [value: number]  // 事件参数用数组(元组)表达
+  close: []                 // 无参数事件
+}&gt;()
+&lt;/script&gt;
+</code></pre>
+
+<h2>共享类型放哪</h2>
+<pre><code>// src/types/layer.ts
+export interface LayerConfig {
+  name: string
+  visible: boolean
+}
+// 组件里: import type { LayerConfig } from '@/types/layer'
+</code></pre>
+<p>局部类型就近写在组件里;被 3+ 处引用才拆到 <code>src/types/</code>。</p>
+
+<h2>类型检查命令</h2>
+<pre><code>vue-tsc --noEmit   # 不是 tsc,因为 tsc 不认识 .vue 文件结构
+</code></pre>
+
+<div class="callout">
+<div class="callout-title">记住</div>
+<code>strict</code> 越早开越好,老项目后补代价很高。<code>defineProps&lt;T&gt;()</code> 泛型写法能表达可选字段/联合类型等运行时写法很难表达的结构。
+</div>
+
+<p class="note">来源:<a href="https://www.typescriptlang.org/tsconfig/">TypeScript Handbook · tsconfig Reference</a> / <a href="https://vuejs.org/guide/typescript/overview.html">Vue · Using Vue with TypeScript</a></p>
+
+</div>
+</body>
+</html>
